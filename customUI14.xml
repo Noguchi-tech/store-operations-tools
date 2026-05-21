@@ -1,0 +1,61 @@
+<!--
+  Excel リボンに「便利ツール」タブを追加するための定義です。
+  各 button の onAction は modRibbonCallbacks.bas の Public Sub に対応します。
+-->
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui" onLoad="RibbonOnLoad">
+  <ribbon>
+    <tabs>
+      <tab id="tabBenriTools" label="便利ツール">
+        <group id="grpKoten" label="個店">
+          <!-- 在庫コントロールの通常入口。固定条件で共通エンジンを実行します。 -->
+          <!-- onAction は modRibbonCallbacks.bas の同名プロシージャに対応します。 -->
+          <!-- AM列のフェイス陳列数行に入った維持フラグ「2」を、ログへ残してから空白にします。 -->
+          <button
+            id="btnKeepFaceFlag"
+            label="AM維持退避"
+            size="large"
+            imageMso="MoveToFolder"
+            screentip="AM列の維持フラグ退避"
+            supertip="AM列のフェイス陳列数行にある2の商品JANを新規ブックへ保存してから消去します。保存先は初回に選択し、次回以降も変更できます。"
+            onAction="RunKeepFaceFlagFromRibbon" />
+          <!-- 目標手持週数と最下限値を入力してから、共通エンジンを実行します。 -->
+          <button
+            id="btnManualAdjust"
+            label="手動調整"
+            size="large"
+            imageMso="CalculateSheet"
+            screentip="在庫手動調整（マニュアルモード）"
+            supertip="手持週数と最下限値を指定して、販売計画・フェイス陳列数を手動設定します。"
+            onAction="RunManualAdjustFromRibbon" />
+          <!-- modCommonで設定されている手持週数と最下限値で、エンジンを実行します。 -->
+          <button
+            id="btnStockAdjust"
+            label="自動調整"
+            size="large"
+            imageMso="CalculateNow"
+            screentip="在庫コントロール自動調整"
+            supertip="対象列の販売計画・フェイス陳列数を自動調整します。"
+            onAction="RunStockAdjustFromRibbon" />
+          <!-- 色と変更フラグだけを戻し、販売計画・フェイス陳列数の値は変更しません。 -->
+          <button
+            id="btnResetIntention"
+            label="列単位&#xA;脱色"
+            size="large"
+            imageMso="TableEraser"
+            screentip="指定列範囲の脱色"
+            supertip="Z～AKの範囲で開始列〜終了列を指定し、その範囲内の色と変更記録を解除します。change_flag_sheet のフラグと再エクスポート時の着色フラグを消し、change_bf_data の色も通常状態に戻します。"
+            onAction="RunResetIntentionFromRibbon" />
+          <!-- 選択したセルだけを、販売計画行・フェイス陳列数行それぞれの通常色へ戻します。 -->
+          <button
+            id="btnResetSelectedCells"
+            label="局所脱色"
+            size="large"
+            imageMso="TableEraser"
+            screentip="選択セルだけの脱色"
+            supertip="list シートのZ～AKで選択しているセルだけを脱色します。販売計画行は販売計画用の基本色、フェイス陳列数行はフェイス用の基本色へ戻し、変更フラグと再エクスポート時の着色フラグも消します。"
+            onAction="RunResetSelectedCellsFromRibbon" />
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>
