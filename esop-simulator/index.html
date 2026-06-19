@@ -76,6 +76,18 @@
   .expl ul{margin:6px 0;padding-left:20px}
   .expl li{margin:3px 0}
   .pull{background:#eef5ff;border-left:4px solid var(--brand);padding:10px 14px;border-radius:6px;margin:10px 0;font-weight:600}
+  /* PR hero */
+  .pr{background:linear-gradient(135deg,#1f6feb,#1751b8);color:#fff;border-radius:14px;
+    padding:20px 18px;margin-bottom:14px;box-shadow:0 4px 14px rgba(23,81,184,.25)}
+  .pr .catch{font-size:1.18rem;font-weight:800;line-height:1.45;margin:0 0 8px}
+  .pr .catch .hl{color:#ffe08a}
+  .pr p{margin:0 0 12px;font-size:.9rem;opacity:.96}
+  .pr .pts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0}
+  @media(max-width:480px){.pr .pts{grid-template-columns:1fr}}
+  .pr .pt{background:rgba(255,255,255,.14);border-radius:9px;padding:9px 11px;font-size:.82rem;font-weight:600}
+  .pr .pt b{display:block;font-size:.95rem;margin-bottom:1px}
+  .pr .cta{margin-top:12px;font-size:.86rem;font-weight:700;background:rgba(255,255,255,.18);
+    border-radius:9px;padding:10px 12px;text-align:center}
   .note{font-size:.76rem;color:var(--sub);background:#fbfbfb;border:1px dashed var(--line);
     border-radius:10px;padding:12px 14px;margin-top:6px}
   canvas{width:100%;height:auto;display:block}
@@ -90,6 +102,19 @@
 </header>
 
 <div class="wrap">
+
+  <!-- PR（紹介） -->
+  <div class="pr">
+    <p class="catch">将来の自分に、毎月ひと積み。<br><span class="hl">月1,000円</span>から始める、自社株のつみたて。</p>
+    <p>持株会は、毎月決めた金額で自社株をコツコツ買っていく制度です。給与天引きだから手間いらず。買うタイミングを考えなくても、続けるほど株数が積み上がっていきます。当社は通常の持株に加えて<strong>退職金ポイント</strong>も上乗せされるので、長く働く人ほど効いてきます。</p>
+    <div class="pts">
+      <div class="pt"><b>かんたん</b>給与天引きで自動つみたて</div>
+      <div class="pt"><b>少額からOK</b>月1,000円でも始められる</div>
+      <div class="pt"><b>上乗せあり</b>退職金ポイントも積み上がる</div>
+      <div class="pt"><b>時間が味方</b>若いうちほど有利</div>
+    </div>
+    <div class="cta">まずは下の数字を動かして、あなたの「将来いくら？」を見てみましょう 👇</div>
+  </div>
 
   <!-- 初心者向け説明 -->
   <details class="expl">
@@ -129,8 +154,8 @@
       </div>
       <div>
         <label class="field">毎月の拠出額（円）</label>
-        <input type="number" id="monthly" value="100000" min="0" step="1000">
-        <div class="hint">給与から毎月積み立てる金額</div>
+        <input type="number" id="monthly" value="1000" min="0" step="1000">
+        <div class="hint">給与から毎月積み立てる金額（初期値 1,000円）</div>
       </div>
       <div>
         <label class="field">拠出する年数（年）</label>
@@ -166,8 +191,8 @@
       </div>
       <div>
         <label class="field">ボーナス月の追加拠出額（円／回）</label>
-        <input type="number" id="bonusAmt" value="200000" min="0" step="1000">
-        <div class="hint">社員は毎月拠出額の2倍が目安（初期値 200,000円）</div>
+        <input type="number" id="bonusAmt" value="2000" min="0" step="1000">
+        <div class="hint">社員は毎月拠出額の2倍が目安（初期値 2,000円）</div>
       </div>
       <div>
         <label class="field">ボーナス月</label>
@@ -286,8 +311,8 @@
 "use strict";
 
 const DEFAULTS = {
-  stockPrice:3568, monthly:100000, contribYears:33, simYears:33,
-  growthSel:"0.05", growthCustom:5, bonus:1, bonusAmt:200000,
+  stockPrice:3568, monthly:1000, contribYears:33, simYears:33,
+  growthSel:"0.05", growthCustom:5, bonus:1, bonusAmt:2000,
   bonusMonths:[6,12], nomuraInit:0, pointsInit:0,
   bookValue:1121, grantRate:50, bookMode:"custom", firstUpdate:2, updateCycle:10
 };
