@@ -6,17 +6,12 @@ Option Explicit
 ' AM列フェイス維持フラグ退避
 ' =============================================================================
 ' MDシステムへ渡せない AM 列の維持フラグを履歴保存し、対象セルを空白化します。
+' 自動調整・手動調整の前処理として、RunStockControlCore から既定で呼び出されます。
 
-Public Sub AM列フェイス維持フラグ退避()
-    Const PROC_NAME As String = "AM列フェイス維持フラグ退避"
-
-    On Error GoTo EH
-
-    Dim wb As Workbook
-    Dim ws As Worksheet
-    Dim wsFlag As Worksheet
-    Dim appState As ApplicationState
-    Dim ans As VbMsgBoxResult
+Public Function ExecuteKeepFaceFlagEvacuation(ByVal ws As Worksheet, ByVal wsFlag As Worksheet, ByRef resultNote As String) As Boolean
+    ' AM列のフェイス陳列数行にある維持フラグ「2」を、履歴ブックへ保存してから空白化します。
+    ' 戻り値が False の場合は履歴保存先が確定しなかったため、呼び出し側で処理を中止してください。
+    ' エラーは呼び出し側（RunStockControlCore）のエラー処理へそのまま伝えます。
     Dim lastInputRow As Long
     Dim planRow As Long
     Dim stockRow As Long
@@ -33,41 +28,13 @@ Public Sub AM列フェイス維持フラグ退避()
     Dim appendedHistoryCount As Long
     Dim duplicateSkippedCount As Long
     Dim duplicateDeletedCount As Long
-    Dim completeMsg As String
-    Dim stepName As String
 
-    stepName = "対象ブックと list シートの取得"
-    Set wb = GetActiveTargetWorkbookOrNothing()
-    If wb Is Nothing Then
-        MsgBox "対象ブックが見つかりません。処理したいブックを前面にしてから実行してください。", vbExclamation
-        Exit Sub
-    End If
-
-    Set ws = GetWorksheetOrNothing(wb, SHEET_NAME)
-    If ws Is Nothing Then
-        MsgBox "Sheet '" & SHEET_NAME & "' が見つかりません。", vbExclamation
-        Exit Sub
-    End If
-    Set wsFlag = GetRequiredFlagWorksheet(wb)
-    If wsFlag Is Nothing Then
-        MsgBox "change_flag_sheet が見つかりません。MDシステム取込用の変更フラグを記録できないため、処理を中止します。", vbExclamation
-        Exit Sub
-    End If
-
-    ' いきなり消去せず、履歴ブックを作ることを実行者に確認してから進めます。
-    ans = MsgBox( _
-        "AM列のフェイス陳列数行にある維持フラグ「2」のJANを、別ブックに保存してから空白にします。" & vbCrLf & vbCrLf & _
-        "MDシステムへインポートする前の前処理として実行してください。" & vbCrLf & _
-        "続行しますか？", _
-        vbOKCancel + vbQuestion, _
-        "AM列維持フラグ退避")
-    If ans = vbCancel Then Exit Sub
+    resultNote = "対象なし"
 
     colNo = ws.Columns(KEEP_FACE_FLAG_COL).Column
     lastInputRow = ws.Cells(ws.Rows.Count, ITEM_CHECK_COL).End(xlUp).Row
 
     ' 先に対象行と JAN を集め、履歴保存に成功してから実セルを消します。
-    stepName = "AM列維持フラグ対象の収集"
     For planRow = START_ROW To lastInputRow Step STEP_ROW
         If ShouldExitSkuLoop(ws.Cells(planRow, ITEM_CHECK_COL).Value) Then Exit For
 
@@ -88,55 +55,43 @@ Public Sub AM列フェイス維持フラグ退避()
         End If
     Next planRow
 
-    If flagCount > 0 Then
-        stepName = "AM維持フラグ履歴ブックの保存先取得"
-        saveFolder = ResolveKeepFaceHistoryFolder()
-        If Len(saveFolder) = 0 Then Exit Sub
-
-        stepName = "AM維持フラグ履歴ブックの保存"
-        historyPath = BuildKeepFaceHistoryFilePath(saveFolder)
-        SaveKeepFaceHistoryWorkbook janValues, flagCount, historyPath, appendedHistoryCount, duplicateSkippedCount, duplicateDeletedCount
-
-        ' 履歴保存後にだけ対象セルを空白化し、変更印を残します。
-        stepName = "Excel の再計算と画面更新を一時停止"
-        BeginApplicationQuietMode appState
-
-        stepName = "AM列維持フラグの消去"
-        For i = 1 To flagCount
-            Set targetCell = ws.Cells(flagRows(i), colNo)
-            If IsKeepFaceFlagValue(targetCell.Value) And Not targetCell.HasFormula Then
-                targetCell.ClearContents
-                targetCell.Interior.Color = WRITTEN_COLOR()
-                MarkChanged ws, wsFlag, flagRows(i), colNo
-                clearedCount = clearedCount + 1
-            End If
-        Next i
+    If flagCount = 0 Then
+        If skippedFormulaCount > 0 Then
+            resultNote = "対象なし（数式セルのため消去できない2が " & CStr(skippedFormulaCount) & " 件）"
+        End If
+        ExecuteKeepFaceFlagEvacuation = True
+        Exit Function
     End If
 
-    stepName = "完了メッセージ表示"
-    completeMsg = "AM列の維持フラグ退避が完了しました。" & vbCrLf & _
-                  "退避して消去した件数: " & CStr(clearedCount) & vbCrLf & _
-                  "履歴へ新規保存したJAN件数: " & CStr(appendedHistoryCount) & vbCrLf & _
-                  "重複のため追記しなかったJAN件数: " & CStr(duplicateSkippedCount) & vbCrLf & _
-                  "数式セルのため消去しなかった件数: " & CStr(skippedFormulaCount)
-    If duplicateDeletedCount > 0 Then
-        completeMsg = completeMsg & vbCrLf & "履歴ブック内の重複削除件数: " & CStr(duplicateDeletedCount)
+    ' 履歴保存先が確定しない場合は、対象セルを消さずに中止扱いにします。
+    saveFolder = ResolveKeepFaceHistoryFolder()
+    If Len(saveFolder) = 0 Then
+        resultNote = "保存先が確定しなかったため中止"
+        Exit Function
     End If
-    If clearedCount > 0 Then
-        completeMsg = completeMsg & vbCrLf & "保存先: " & historyPath
-    Else
-        completeMsg = completeMsg & vbCrLf & "退避・消去できる2はありませんでした。"
-    End If
-    MsgBox completeMsg, vbInformation
 
-CLEANUP:
-    RestoreApplicationState appState
-    Exit Sub
+    historyPath = BuildKeepFaceHistoryFilePath(saveFolder)
+    SaveKeepFaceHistoryWorkbook janValues, flagCount, historyPath, appendedHistoryCount, duplicateSkippedCount, duplicateDeletedCount
 
-EH:
-    ReportMacroError PROC_NAME, stepName, Err.Number, Err.Description, wb, ws, planRow, stockRow, colNo
-    Resume CLEANUP
-End Sub
+    ' 履歴保存後にだけ対象セルを空白化し、変更印を残します。
+    For i = 1 To flagCount
+        Set targetCell = ws.Cells(flagRows(i), colNo)
+        If IsKeepFaceFlagValue(targetCell.Value) And Not targetCell.HasFormula Then
+            targetCell.ClearContents
+            targetCell.Interior.Color = WRITTEN_COLOR()
+            MarkChanged ws, wsFlag, flagRows(i), colNo
+            clearedCount = clearedCount + 1
+        End If
+    Next i
+
+    resultNote = "退避して消去 " & CStr(clearedCount) & " 件（履歴へ新規保存 " & CStr(appendedHistoryCount) & " 件）"
+    If duplicateSkippedCount > 0 Then resultNote = resultNote & "、重複のため追記なし " & CStr(duplicateSkippedCount) & " 件"
+    If duplicateDeletedCount > 0 Then resultNote = resultNote & "、履歴内の重複削除 " & CStr(duplicateDeletedCount) & " 件"
+    If skippedFormulaCount > 0 Then resultNote = resultNote & "、数式のため未消去 " & CStr(skippedFormulaCount) & " 件"
+    resultNote = resultNote & vbCrLf & "　履歴保存先：" & historyPath
+
+    ExecuteKeepFaceFlagEvacuation = True
+End Function
 
 Public Function IsKeepFaceFlagValue(ByVal v As Variant) As Boolean
     ' AM列維持フラグとして扱う値かを、数値誤差込みで判定します。

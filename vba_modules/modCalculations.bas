@@ -254,6 +254,9 @@ Public Function GetPriorityFaceQty(ByVal ws As Worksheet, ByVal planRow As Long,
         candidateVal = relationFloor
     End If
 
+    ' 店型2陳列数(本部推奨)に数値が入っている場合は、その数値をそのまま加算します。
+    candidateVal = candidateVal + GetStoreType2FaceAddition(ws, planRow, colNo)
+
     GetPriorityFaceQty = ClampFaceValueToSheetLimits(candidateVal, ws, planRow, colNo)
 End Function
 
@@ -401,6 +404,19 @@ Public Function HqFaceTotal(ByVal ws As Worksheet, ByVal planRow As Long, ByVal 
     ' 本部フェイスは2行に分かれているため合算して判定します。
     HqFaceTotal = ToDouble(ws.Cells(planRow + FACE_HQ_1_OFFSET, colNo).Value) + _
                   ToDouble(ws.Cells(planRow + FACE_HQ_2_OFFSET, colNo).Value)
+End Function
+
+Public Function GetStoreType2FaceAddition(ByVal ws As Worksheet, ByVal planRow As Long, ByVal colNo As Long) As Long
+    ' 店型2陳列数(本部推奨)行は、マクロが入力するフェイス陳列数行の1行上（planRow + FACE_HQ_2_OFFSET）です。
+    ' 数値が入っている場合だけ、その数値をそのままフェイス陳列数への加算分として返します。
+    Dim v As Variant
+
+    v = ws.Cells(planRow + FACE_HQ_2_OFFSET, colNo).Value
+    If IsError(v) Then Exit Function
+    If Not IsNumeric(v) Then Exit Function
+    If CDbl(v) <= 0# Then Exit Function
+
+    GetStoreType2FaceAddition = CeilToLong(CDbl(v))
 End Function
 
 Public Function ShouldAdjustByHqFace(ByVal ws As Worksheet, ByVal planRow As Long, ByVal colNo As Long, ByVal minVal As Long) As Boolean

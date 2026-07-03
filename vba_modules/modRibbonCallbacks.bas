@@ -69,14 +69,14 @@ EH:
     ReportMacroError "RunResetSelectedCellsFromRibbon", "局所脱色ボタン", Err.Number, Err.Description, ActiveWorkbook
 End Sub
 
-Public Sub RunKeepFaceFlagFromRibbon(ByVal control As IRibbonControl)
+Public Sub RunExportSelectionPdfFromRibbon(ByVal control As IRibbonControl)
     On Error GoTo EH
 
-    ' MDシステムへ取り込めない AM 列の維持フラグを、履歴保存してから消去します。
-    ' customUI14.xml: btnKeepFaceFlag
-    Call AM列フェイス維持フラグ退避
+    ' 選択中のセル範囲を A4片面（1ページ）の PDF として保存します。
+    ' customUI14.xml: btnExportSelectionPdf
+    Call 選択範囲PDF出力
     Exit Sub
 
 EH:
-    ReportMacroError "RunKeepFaceFlagFromRibbon", "AM列維持フラグ退避ボタン", Err.Number, Err.Description, ActiveWorkbook
+    ReportMacroError "RunExportSelectionPdfFromRibbon", "選択範囲PDF出力ボタン", Err.Number, Err.Description, ActiveWorkbook
 End Sub

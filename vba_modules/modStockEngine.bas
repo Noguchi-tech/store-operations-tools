@@ -40,6 +40,7 @@ Public Sub RunStockControlCore(ByVal modeName As String, ByVal targetWeeks As Do
     Dim saveNote As String
     Dim completeMsg As String
     Dim scopeLabel As String
+    Dim keepFaceNote As String
     Dim stepName As String
 
     stepName = "対象ブックと list シートの取得"
@@ -69,6 +70,13 @@ Public Sub RunStockControlCore(ByVal modeName As String, ByVal targetWeeks As Do
 
     stepName = "Excel の再計算と画面更新を一時停止"
     BeginApplicationQuietMode appState
+
+    ' MDシステムへ渡せない AM列の維持フラグは、調整の前処理として既定で退避・消去します。
+    stepName = "AM列維持フラグの退避"
+    If Not ExecuteKeepFaceFlagEvacuation(ws, wsFlag, keepFaceNote) Then
+        MsgBox "AM維持フラグ履歴の保存先が確定しなかったため、" & modeName & "を中止しました。", vbExclamation
+        GoTo CLEANUP
+    End If
 
     ' F列の最終入力行まで、22行単位の商品ブロックとして処理します。
     ' planRow が販売計画行、stockRow が同じ商品のフェイス陳列数行を表します。
@@ -172,7 +180,8 @@ NEXT_SKU:
                   "手持週数：" & Format$(targetWeeks, "0.0") & "週" & vbCrLf & _
                   "運用側最下限値：" & CStr(minVal) & vbCrLf & _
                   "保存名：" & IIf(Len(adjustedPath) > 0, adjustedPath, "保存なし") & vbCrLf & _
-                  "元ファイル削除結果：" & saveNote
+                  "元ファイル削除結果：" & saveNote & vbCrLf & _
+                  "AM維持フラグ退避：" & keepFaceNote
 
     MsgBox completeMsg, vbInformation
 

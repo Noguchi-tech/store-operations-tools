@@ -9,15 +9,7 @@
         <group id="grpKoten" label="個店">
           <!-- 在庫コントロールの通常入口。固定条件で共通エンジンを実行します。 -->
           <!-- onAction は modRibbonCallbacks.bas の同名プロシージャに対応します。 -->
-          <!-- AM列のフェイス陳列数行に入った維持フラグ「2」を、ログへ残してから空白にします。 -->
-          <button
-            id="btnKeepFaceFlag"
-            label="AM維持退避"
-            size="large"
-            imageMso="MoveToFolder"
-            screentip="AM列の維持フラグ退避"
-            supertip="AM列のフェイス陳列数行にある2の商品JANを新規ブックへ保存してから消去します。保存先は初回に選択し、次回以降も変更できます。"
-            onAction="RunKeepFaceFlagFromRibbon" />
+          <!-- AM列維持フラグの退避は、手動調整・自動調整の前処理として既定で実行されます。 -->
           <!-- 目標手持週数と最下限値を入力してから、共通エンジンを実行します。 -->
           <button
             id="btnManualAdjust"
@@ -25,7 +17,7 @@
             size="large"
             imageMso="CalculateSheet"
             screentip="在庫手動調整（マニュアルモード）"
-            supertip="手持週数と最下限値を指定して、販売計画・フェイス陳列数を手動設定します。"
+            supertip="手持週数と最下限値を指定して、販売計画・フェイス陳列数を手動設定します。AM列の維持フラグ「2」は、履歴ブックへ保存してから自動で空白化します。"
             onAction="RunManualAdjustFromRibbon" />
           <!-- modCommonで設定されている手持週数と最下限値で、エンジンを実行します。 -->
           <button
@@ -34,7 +26,7 @@
             size="large"
             imageMso="CalculateNow"
             screentip="在庫コントロール自動調整"
-            supertip="対象列の販売計画・フェイス陳列数を自動調整します。"
+            supertip="対象列の販売計画・フェイス陳列数を自動調整します。AM列の維持フラグ「2」は、履歴ブックへ保存してから自動で空白化します。"
             onAction="RunStockAdjustFromRibbon" />
           <!-- 色と変更フラグだけを戻し、販売計画・フェイス陳列数の値は変更しません。 -->
           <button
@@ -54,6 +46,17 @@
             screentip="選択セルだけの脱色"
             supertip="list シートのZ～AKで選択しているセルだけを脱色します。販売計画行は販売計画用の基本色、フェイス陳列数行はフェイス用の基本色へ戻し、変更フラグと再エクスポート時の着色フラグも消します。"
             onAction="RunResetSelectedCellsFromRibbon" />
+        </group>
+        <group id="grpOutput" label="出力">
+          <!-- 選択中のセル範囲を、A4用紙1ページ（片面）に収めてPDF保存します。 -->
+          <button
+            id="btnExportSelectionPdf"
+            label="選択範囲&#xA;PDF出力"
+            size="large"
+            imageMso="FileSaveAsPdfOrXps"
+            screentip="選択範囲をA4片面でPDF出力"
+            supertip="選択しているセル範囲を、A4用紙1ページ（片面）に収めてPDFファイルとして保存します。保存先はダイアログで指定します。"
+            onAction="RunExportSelectionPdfFromRibbon" />
         </group>
       </tab>
     </tabs>
