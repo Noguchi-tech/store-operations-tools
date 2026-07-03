@@ -5,17 +5,23 @@ Option Explicit
 ' =============================================================================
 ' 保存先フォルダ選択・記憶
 ' =============================================================================
-' 操作PCごとに変わる保存先の選択、前回保存先の再利用、フォルダピッカーの初期位置を扱います。
+' 調整後ブックの保存先（Downloads 固定）、AM維持フラグ履歴の前回保存先の再利用、
+' フォルダピッカーの初期位置を扱います。
 
-Public Function GetWorkbookSaveFolder(ByVal wb As Workbook) As String
-    ' 元ブックがローカルに保存済みなら同じフォルダ、未保存やURLなら選択ダイアログを使います。
-    If wb Is Nothing Then Exit Function
-    If Len(wb.Path) > 0 And InStr(1, wb.Path, "://", vbTextCompare) = 0 Then
-        GetWorkbookSaveFolder = wb.Path
+Public Function ResolveAdjustedWorkbookSaveFolder() As String
+    ' 調整後ブックの保存先は、操作PCの Downloads フォルダに固定します。
+    ' ブラウザからダウンロードして直接開いたブックは、元フォルダがキャッシュ等の
+    ' 分かりにくい場所を指すため、元ブックと同じフォルダには保存しません。
+    ' Downloads が見つからないPCに限り、フォルダ選択ダイアログへ切り替えます。
+    Dim folderPath As String
+
+    folderPath = GetDefaultDownloadFolder()
+    If Len(folderPath) > 0 Then
+        ResolveAdjustedWorkbookSaveFolder = folderPath
         Exit Function
     End If
 
-    GetWorkbookSaveFolder = PickAdjustedWorkbookSaveFolder()
+    ResolveAdjustedWorkbookSaveFolder = PickAdjustedWorkbookSaveFolder()
 End Function
 
 Public Function PickAdjustedWorkbookSaveFolder() As String
@@ -98,9 +104,24 @@ Public Function PickKeepFaceHistoryFolder() As String
 End Function
 
 Public Function GetDefaultDownloadFolder() As String
-    ' 保存先選択の初期位置は、操作PCの Downloads フォルダを優先します。
+    ' 操作PCの Downloads フォルダを返します。調整後ブックの保存先と、
+    ' フォルダピッカーの初期位置の両方で使います。
+    ' ブラウザの保存先と一致させるため、Windows の既知フォルダ設定を最優先で
+    ' 解決します（Downloads を別ドライブ等へ移動しているPCでも追従できます）。
     Dim folderPath As String
 
+    On Error Resume Next
+    folderPath = CreateObject("Shell.Application").NameSpace("shell:Downloads").Self.Path
+    On Error GoTo 0
+    folderPath = Trim$(folderPath)
+    If Len(folderPath) > 0 Then
+        If FolderExists(folderPath) Then
+            GetDefaultDownloadFolder = folderPath
+            Exit Function
+        End If
+    End If
+
+    ' 既知フォルダを解決できない場合は、従来のユーザープロファイル配下を使います。
     folderPath = Trim$(Environ$("USERPROFILE"))
     If Len(folderPath) > 0 Then
         folderPath = CombinePath(folderPath, "Downloads")

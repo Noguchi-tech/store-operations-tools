@@ -22,6 +22,13 @@ Public Const ITEM_CHECK_COL As String = "F"
 Public Const CHANGE_ROW_MARK_COL As Long = 2
 Public Const EPS As Double = 0.0000001
 
+' 編集者名（調整後ファイル名に入る名前）の既定値は、list シート C6 以下の
+' デパ名（例「110:ファニチャー」）から「コロン右側の先頭3文字＋担当」で作ります。
+Public Const OPERATOR_DEPT_COL As String = "C"
+Public Const OPERATOR_DEPT_START_ROW As Long = 6
+Public Const OPERATOR_NAME_CHAR_COUNT As Long = 3
+Public Const OPERATOR_NAME_SUFFIX As String = "担当"
+
 ' AM列のフェイス陳列数行に入る「2」はMDシステムに渡せない維持フラグです。
 Public Const KEEP_FACE_FLAG_COL As String = "AM"
 Public Const KEEP_FACE_FLAG_VALUE As Long = 2
@@ -168,10 +175,12 @@ End Function
 
 Public Function TryGetColumnNumber(ByVal ws As Worksheet, ByVal columnText As String, ByRef colNo As Long) As Boolean
     ' Range("列1") に直接渡す前に、列名だけを安全に検証します。
+    ' 変数名を value にすると、VBE がプロジェクト全体の .Value を .value へ
+    ' 自動リケースしてしまうため、colValue という名前にしています。
     Dim normalized As String
     Dim i As Long
     Dim charCode As Long
-    Dim value As Long
+    Dim colValue As Long
 
     colNo = 0
     If ws Is Nothing Then Exit Function
@@ -183,11 +192,11 @@ Public Function TryGetColumnNumber(ByVal ws As Worksheet, ByVal columnText As St
         charCode = AscW(Mid$(normalized, i, 1))
         If charCode < AscW("A") Or charCode > AscW("Z") Then Exit Function
 
-        value = value * 26 + (charCode - AscW("A") + 1)
-        If value > ws.Columns.Count Then Exit Function
+        colValue = colValue * 26 + (charCode - AscW("A") + 1)
+        If colValue > ws.Columns.Count Then Exit Function
     Next i
 
-    colNo = value
+    colNo = colValue
     TryGetColumnNumber = (colNo > 0)
 End Function
 

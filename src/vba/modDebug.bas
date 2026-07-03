@@ -79,15 +79,17 @@ Private Function BuildLocationText( _
     Optional ByVal colNo As Long = 0) As String
 
     ' 未指定の情報は出さず、分かっている範囲だけをログに載せます。
-    Dim text As String
+    ' 変数名を text にすると、VBE がプロジェクト全体の .Text を .text へ
+    ' 自動リケースし得るため、locationText という名前にしています。
+    Dim locationText As String
 
-    If Not wb Is Nothing Then text = text & "ブック: " & wb.Name & vbCrLf
-    If Not ws Is Nothing Then text = text & "シート: " & ws.Name & vbCrLf
-    If planRow > 0 Then text = text & "販売計画行: " & CStr(planRow) & vbCrLf
-    If stockRow > 0 Then text = text & "フェイス陳列数行: " & CStr(stockRow) & vbCrLf
-    If colNo > 0 Then text = text & "列: " & ColumnLetterFromNumber(colNo) & " (" & CStr(colNo) & ")" & vbCrLf
+    If Not wb Is Nothing Then locationText = locationText & "ブック: " & wb.Name & vbCrLf
+    If Not ws Is Nothing Then locationText = locationText & "シート: " & ws.Name & vbCrLf
+    If planRow > 0 Then locationText = locationText & "販売計画行: " & CStr(planRow) & vbCrLf
+    If stockRow > 0 Then locationText = locationText & "フェイス陳列数行: " & CStr(stockRow) & vbCrLf
+    If colNo > 0 Then locationText = locationText & "列: " & ColumnLetterFromNumber(colNo) & " (" & CStr(colNo) & ")" & vbCrLf
 
-    BuildLocationText = text
+    BuildLocationText = locationText
 End Function
 
 Private Sub AppendDebugLog( _

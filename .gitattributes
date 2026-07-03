@@ -3,3 +3,6 @@
 
 *.xlsm binary
 *.xlam binary
+
+# VBE へ取り込む .bas は常に CRLF（CP932 と合わせて VBE インポートの前提）
+*.bas text eol=crlf

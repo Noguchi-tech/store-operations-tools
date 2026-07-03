@@ -7,9 +7,10 @@ Option Explicit
 ' =============================================================================
 ' 履歴ブック、調整後ブックの保存と、ファイル名の組み立てをまとめます。
 
-Public Function GetKeepFaceHistoryNamePart(ByVal v As Variant) As String
-    ' D列の「コード:名称」のような文字列から、保存名に使う名称部分を取り出します。
-    ' 調整後ブック名では、コロン右側の先頭4文字だけを使います。
+Public Function GetTextAfterColon(ByVal v As Variant) As String
+    ' 「コード:名称」のような文字列から、名称部分を取り出します。
+    ' 半角・全角コロンの早い方で区切り、コロンが無い場合は全体を返します。
+    ' 調整後ブック名の商品名部分と、編集者名の既定値の両方で使う共通処理です。
     Dim s As String
     Dim p1 As Long
     Dim p2 As Long
@@ -33,7 +34,15 @@ Public Function GetKeepFaceHistoryNamePart(ByVal v As Variant) As String
 
     If p > 0 Then s = Mid$(s, p + 1)
 
-    s = Trim$(s)
+    GetTextAfterColon = Trim$(s)
+End Function
+
+Public Function GetKeepFaceHistoryNamePart(ByVal v As Variant) As String
+    ' D列の「コード:名称」のような文字列から、保存名に使う名称部分を取り出します。
+    ' 調整後ブック名では、コロン右側の先頭4文字だけを使います。
+    Dim s As String
+
+    s = GetTextAfterColon(v)
     If Len(s) > 4 Then s = Left$(s, 4)
 
     GetKeepFaceHistoryNamePart = s
@@ -62,12 +71,14 @@ Public Function SanitizeFileNamePart(ByVal s As String) As String
     SanitizeFileNamePart = s
 End Function
 
-Public Function CombinePath(ByVal folderPath As String, ByVal fileName As String) As String
+Public Function CombinePath(ByVal folderPath As String, ByVal itemName As String) As String
     ' フォルダ末尾の \ 有無に関係なく、正しいフルパスを組み立てます。
+    ' 引数名を fileName にすると、VBE が SaveAs の名前付き引数 Filename:= を
+    ' fileName:= へ自動リケースしてしまうため、itemName という名前にしています。
     If Right$(folderPath, 1) = "\" Or Right$(folderPath, 1) = "/" Then
-        CombinePath = folderPath & fileName
+        CombinePath = folderPath & itemName
     Else
-        CombinePath = folderPath & "\" & fileName
+        CombinePath = folderPath & "\" & itemName
     End If
 End Function
 
@@ -313,7 +324,11 @@ Public Function SaveAdjustedWorkbookWithName(ByVal wb As Workbook, ByVal ws As W
         oldFullPath = wb.FullName
     End If
 
-    saveFolder = GetWorkbookSaveFolder(wb)
+    ' 保存先は常に操作PCの Downloads フォルダです（modStorageFolders 参照）。
+    ' 元ブックと同じフォルダへは保存しません。ブラウザから直接開いたブックだと
+    ' 元フォルダがキャッシュ等の分かりにくい場所になり、MDシステムへの取込時に
+    ' ファイルを見失うためです。
+    saveFolder = ResolveAdjustedWorkbookSaveFolder()
     If Len(saveFolder) = 0 Then
         Err.Raise vbObjectError + 5201, "SaveAdjustedWorkbookWithName", "調整後ブックの保存先が選択されなかったため、保存を中止しました。"
     End If
@@ -334,7 +349,13 @@ Public Function SaveAdjustedWorkbookWithName(ByVal wb As Workbook, ByVal ws As W
 
     saveNote = duplicateDeleteNote
     If Len(oldFullPath) > 0 And StrComp(oldFullPath, fullPath, vbTextCompare) <> 0 Then
-        originalDeleteNote = DeleteOriginalWorkbookFile(oldFullPath)
+        ' 元ファイル削除は「Downloads・一時フォルダ・ブラウザキャッシュ」にある場合だけです。
+        ' 共有フォルダやデスクトップ等に置かれた原本まで消さないための安全弁です。
+        If IsSafeOriginalDeleteLocation(oldFullPath) Then
+            originalDeleteNote = DeleteOriginalWorkbookFile(oldFullPath)
+        Else
+            originalDeleteNote = "保持（Downloads・一時フォルダ以外のため削除しません）：" & oldFullPath
+        End If
         If Len(saveNote) > 0 And Len(originalDeleteNote) > 0 Then
             saveNote = saveNote & " / " & originalDeleteNote
         ElseIf Len(originalDeleteNote) > 0 Then
@@ -372,6 +393,47 @@ Private Function DeleteExistingAdjustedWorkbookIfNeeded(ByVal adjustedPath As St
 
 EH:
     Err.Raise vbObjectError + 5202, "DeleteExistingAdjustedWorkbookIfNeeded", "同名の旧ファイルを削除できませんでした：" & Err.Description & "（" & adjustedPath & "）"
+End Function
+
+Public Function IsSafeOriginalDeleteLocation(ByVal oldFullPath As String) As Boolean
+    ' 元ファイルを削除してよい場所かを判定します。
+    ' 保存先が Downloads 固定になったため、元ファイルは任意の場所にあり得ます。
+    ' 削除してよいのは「置きっぱなしでも困らない場所」だけに限定します。
+    '   - Downloads フォルダ配下（ブラウザの通常ダウンロード先）
+    '   - TEMP / TMP 配下
+    '   - ブラウザキャッシュ（INetCache / Temporary Internet Files）
+    ' 共有フォルダ（UNC）やそれ以外のフォルダの原本は削除せず保持します。
+    Dim folderPath As String
+    Dim candidates(1 To 3) As String
+    Dim i As Long
+
+    If Len(oldFullPath) = 0 Then Exit Function
+    If InStr(1, oldFullPath, "://", vbTextCompare) > 0 Then Exit Function
+    If Left$(oldFullPath, 2) = "\\" Then Exit Function
+
+    If InStr(1, oldFullPath, "\INetCache\", vbTextCompare) > 0 Then
+        IsSafeOriginalDeleteLocation = True
+        Exit Function
+    End If
+    If InStr(1, oldFullPath, "\Temporary Internet Files\", vbTextCompare) > 0 Then
+        IsSafeOriginalDeleteLocation = True
+        Exit Function
+    End If
+
+    candidates(1) = GetDefaultDownloadFolder()
+    candidates(2) = Trim$(Environ$("TEMP"))
+    candidates(3) = Trim$(Environ$("TMP"))
+
+    For i = 1 To 3
+        folderPath = candidates(i)
+        If Len(folderPath) > 0 Then
+            If Right$(folderPath, 1) <> "\" Then folderPath = folderPath & "\"
+            If StrComp(Left$(oldFullPath, Len(folderPath)), folderPath, vbTextCompare) = 0 Then
+                IsSafeOriginalDeleteLocation = True
+                Exit Function
+            End If
+        End If
+    Next i
 End Function
 
 Public Function DeleteOriginalWorkbookFile(ByVal oldFullPath As String) As String

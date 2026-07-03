@@ -64,8 +64,9 @@ Public Sub RunStockControlCore(ByVal modeName As String, ByVal targetWeeks As Do
     stepName = "意思入れ済みセルを含めるか確認"
     If Not ConfirmAdjustmentScope(modeName, includeIntentioned, scopeLabel) Then Exit Sub
 
+    ' 既定値を list シートのデパ名から作るため、ws を渡します。
     stepName = "あなたの名前の入力"
-    operatorName = PromptOperatorName(modeName)
+    operatorName = PromptOperatorName(modeName, ws)
     If Len(operatorName) = 0 Then Exit Sub
 
     stepName = "Excel の再計算と画面更新を一時停止"
