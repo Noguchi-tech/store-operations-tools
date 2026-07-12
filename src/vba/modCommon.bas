@@ -33,7 +33,6 @@ Public Const OPERATOR_NAME_SUFFIX As String = "担当"
 Public Const KEEP_FACE_FLAG_COL As String = "AM"
 Public Const KEEP_FACE_FLAG_VALUE As Long = 2
 Public Const KEEP_FACE_HISTORY_FILE_SUFFIX As String = "AM維持フラグ商品履歴"
-Public Const KEEP_FACE_HISTORY_SETTING_KEY As String = "AM維持フラグ履歴保存先"
 Public Const ADJUSTED_BOOK_EXCLUDE_INTENTIONED_SUFFIX As String = "_未意思入のみ"
 ' 再エクスポート時の起動マクロが読む着色フラグは、対象列から15列右にあります。
 Public Const REEXPORT_COLOR_FLAG_COL_OFFSET As Long = 15

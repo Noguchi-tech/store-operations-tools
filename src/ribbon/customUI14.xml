@@ -9,7 +9,7 @@
         <group id="grpKoten" label="個店">
           <!-- 在庫コントロールの通常入口。固定条件で共通エンジンを実行します。 -->
           <!-- onAction は modRibbonCallbacks.bas の同名プロシージャに対応します。 -->
-          <!-- AM列維持フラグの退避は、手動調整・自動調整の前処理として既定で実行されます。 -->
+          <!-- AM列維持フラグの退避は、手動調整・自動調整・HB食品用調整の前処理として既定で実行されます。 -->
           <!-- 目標手持週数と最下限値を入力してから、共通エンジンを実行します。 -->
           <button
             id="btnManualAdjust"
@@ -28,6 +28,15 @@
             screentip="在庫コントロール自動調整"
             supertip="対象列の販売計画・フェイス陳列数を自動調整します。AM列の維持フラグ「2」は、履歴ブックへ保存してから自動で空白化します。"
             onAction="RunStockAdjustFromRibbon" />
+          <!-- 店型2陳列数(本部推奨)を使わない手動調整です。HB・食品の売場向けです。 -->
+          <button
+            id="btnHbFoodAdjust"
+            label="HB&#xA;食品用"
+            size="large"
+            imageMso="CalculateSheet"
+            screentip="HB食品用調整（店型2陳列数を使わない手動調整）"
+            supertip="手持週数と最下限値を指定して、販売計画・フェイス陳列数を調整します。店型2陳列数(本部推奨)は使用せず、フェイス陳列数(本部推奨)のみで計算します。AM列の維持フラグ「2」は、履歴ブックへ保存してから自動で空白化します。"
+            onAction="RunHbFoodAdjustFromRibbon" />
           <!-- 色と変更フラグだけを戻し、販売計画・フェイス陳列数の値は変更しません。 -->
           <button
             id="btnResetIntention"

@@ -6,7 +6,7 @@ Option Explicit
 ' AM列フェイス維持フラグ退避
 ' =============================================================================
 ' MDシステムへ渡せない AM 列の維持フラグを履歴保存し、対象セルを空白化します。
-' 自動調整・手動調整の前処理として、RunStockControlCore から既定で呼び出されます。
+' 自動調整・手動調整・HB食品用調整の前処理として、RunStockControlCore から既定で呼び出されます。
 
 Public Function ExecuteKeepFaceFlagEvacuation(ByVal ws As Worksheet, ByVal wsFlag As Worksheet, ByRef resultNote As String) As Boolean
     ' AM列のフェイス陳列数行にある維持フラグ「2」を、履歴ブックへ保存してから空白化します。

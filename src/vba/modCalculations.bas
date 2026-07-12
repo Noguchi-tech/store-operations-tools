@@ -223,8 +223,9 @@ Public Function GetBestFaceQty(ByVal planVal As Double, ByVal lowerFace As Doubl
     End If
 End Function
 
-Public Function GetPriorityFaceQty(ByVal ws As Worksheet, ByVal planRow As Long, ByVal colNo As Long, ByVal planVal As Double, Optional ByVal minVal As Long = DEFAULT_MIN_VAL, Optional ByVal targetWeeks As Double = 2#) As Long
+Public Function GetPriorityFaceQty(ByVal ws As Worksheet, ByVal planRow As Long, ByVal colNo As Long, ByVal planVal As Double, Optional ByVal minVal As Long = DEFAULT_MIN_VAL, Optional ByVal targetWeeks As Double = 2#, Optional ByVal addStoreType2 As Boolean = True) As Long
     ' 優先順位は「シート上下限 > 手持週数 > 運用下限値/HQ関係」。売れ筋を機械的に下げないため、手持週数側の必要数を先に見ます。
+    ' addStoreType2 が False の場合（HB食品用）は、店型2陳列数(本部推奨)を加算しません。
     Dim lowerFace As Double
     Dim upperFace As Long
     Dim hqFace As Double
@@ -236,7 +237,7 @@ Public Function GetPriorityFaceQty(ByVal ws As Worksheet, ByVal planRow As Long,
 
     lowerFace = ToDouble(ws.Cells(planRow + DISP_LOWER_OFFSET, colNo).Value)
     upperFace = GetFaceUpperLimit(ws, planRow, colNo)
-    hqFace = HqFaceTotal(ws, planRow, colNo)
+    hqFace = HqFaceBase(ws, planRow, colNo)
 
     handWeeksVal = GetBestFaceQty(planVal, lowerFace, CDbl(upperFace), 0, targetWeeks)
 
@@ -254,8 +255,10 @@ Public Function GetPriorityFaceQty(ByVal ws As Worksheet, ByVal planRow As Long,
         candidateVal = relationFloor
     End If
 
-    ' 店型2陳列数(本部推奨)に数値が入っている場合は、その数値をそのまま加算します。
-    candidateVal = candidateVal + GetStoreType2FaceAddition(ws, planRow, colNo)
+    ' 店型2陳列数(本部推奨)に数値が入っている場合は、その数値をそのまま加算します（半分にはしません）。
+    If addStoreType2 Then
+        candidateVal = candidateVal + GetStoreType2FaceAddition(ws, planRow, colNo)
+    End If
 
     GetPriorityFaceQty = ClampFaceValueToSheetLimits(candidateVal, ws, planRow, colNo)
 End Function
@@ -313,8 +316,8 @@ Public Function ClampExistingFaceIfNeeded(ByVal ws As Worksheet, ByVal wsFlag As
     ClampExistingFaceIfNeeded = True
 End Function
 
-Public Function AdjustFaceForLowHqIfNeeded(ByVal ws As Worksheet, ByVal wsFlag As Worksheet, ByVal stockRow As Long, ByVal colLetter As String, ByVal planRow As Long, Optional ByVal minVal As Long = DEFAULT_MIN_VAL, Optional ByVal targetWeeks As Double = 2#) As Boolean
-    ' 本部推奨が運用側下限以下の場合も、手持週数を優先しつつ本部推奨側へ寄せます。
+Public Function AdjustFaceForLowHqIfNeeded(ByVal ws As Worksheet, ByVal wsFlag As Worksheet, ByVal stockRow As Long, ByVal colLetter As String, ByVal planRow As Long, Optional ByVal minVal As Long = DEFAULT_MIN_VAL, Optional ByVal targetWeeks As Double = 2#, Optional ByVal addStoreType2 As Boolean = True) As Boolean
+    ' 本部推奨フェイス1が運用側下限以下の場合も、手持週数を優先しつつ本部推奨側へ寄せます。
     Dim colNo As Long
     Dim stockCell As Range
     Dim currentRaw As Variant
@@ -334,33 +337,41 @@ Public Function AdjustFaceForLowHqIfNeeded(ByVal ws As Worksheet, ByVal wsFlag A
     If Not IsNumeric(currentRaw) Then Exit Function
 
     currentVal = CDbl(currentRaw)
-    hqFace = HqFaceTotal(ws, planRow, colNo)
+    hqFace = HqFaceBase(ws, planRow, colNo)
     If hqFace <= 0# Then Exit Function
     If hqFace > CDbl(minVal) Then Exit Function
 
     currentPlan = ToDouble(ws.Cells(planRow, colNo).Value)
-    targetVal = GetPriorityFaceQty(ws, planRow, colNo, currentPlan, minVal, targetWeeks)
+    targetVal = GetPriorityFaceQty(ws, planRow, colNo, currentPlan, minVal, targetWeeks, addStoreType2)
     If Abs(currentVal - CDbl(targetVal)) <= EPS Then Exit Function
 
     WriteIfChanged ws, wsFlag, stockRow, colLetter, CDbl(targetVal), planRow, stockRow
     AdjustFaceForLowHqIfNeeded = True
 End Function
 
-Public Function IsNoSalesPlanWeek(ByVal ws As Worksheet, ByVal planRow As Long, ByVal colNo As Long) As Boolean
-    ' 本部推奨フェイス2行がどちらも0なら、その週は販売予定なしとして一切書き換えません。
-    IsNoSalesPlanWeek = _
-        Abs(ToDouble(ws.Cells(planRow + FACE_HQ_1_OFFSET, colNo).Value)) <= EPS And _
-        Abs(ToDouble(ws.Cells(planRow + FACE_HQ_2_OFFSET, colNo).Value)) <= EPS
+Public Function IsNoSalesPlanWeek(ByVal ws As Worksheet, ByVal planRow As Long, ByVal colNo As Long, Optional ByVal includeStoreType2 As Boolean = True) As Boolean
+    ' 本部推奨フェイス行が0なら、その週は販売予定なしとして一切書き換えません。
+    ' 通常はフェイス1と店型2の両方で、HB食品用（includeStoreType2 = False）はフェイス1だけで判定します。
+    Dim face1IsZero As Boolean
+
+    face1IsZero = (Abs(ToDouble(ws.Cells(planRow + FACE_HQ_1_OFFSET, colNo).Value)) <= EPS)
+
+    If includeStoreType2 Then
+        IsNoSalesPlanWeek = face1IsZero And _
+            (Abs(ToDouble(ws.Cells(planRow + FACE_HQ_2_OFFSET, colNo).Value)) <= EPS)
+    Else
+        IsNoSalesPlanWeek = face1IsZero
+    End If
 End Function
 
-Public Function HasAnySalesPlanTargetWeek(ByVal ws As Worksheet, ByVal planRow As Long, ByVal cols As Variant) As Boolean
+Public Function HasAnySalesPlanTargetWeek(ByVal ws As Worksheet, ByVal planRow As Long, ByVal cols As Variant, Optional ByVal includeStoreType2 As Boolean = True) As Boolean
     ' 対象列の全週が販売予定なしなら、過去実績倍率の計算も含めて SKU 全体を触りません。
     Dim c As Variant
     Dim colNo As Long
 
     For Each c In cols
         colNo = ws.Columns(CStr(c)).Column
-        If Not IsNoSalesPlanWeek(ws, planRow, colNo) Then
+        If Not IsNoSalesPlanWeek(ws, planRow, colNo, includeStoreType2) Then
             HasAnySalesPlanTargetWeek = True
             Exit Function
         End If
@@ -400,10 +411,10 @@ Public Function CanWriteTargetCell(ByVal targetCell As Range, ByVal includeInten
     End If
 End Function
 
-Public Function HqFaceTotal(ByVal ws As Worksheet, ByVal planRow As Long, ByVal colNo As Long) As Double
-    ' 本部フェイスは2行に分かれているため合算して判定します。
-    HqFaceTotal = ToDouble(ws.Cells(planRow + FACE_HQ_1_OFFSET, colNo).Value) + _
-                  ToDouble(ws.Cells(planRow + FACE_HQ_2_OFFSET, colNo).Value)
+Public Function HqFaceBase(ByVal ws As Worksheet, ByVal planRow As Long, ByVal colNo As Long) As Double
+    ' 調整対象の判定と下限側の寄せ先には、本部推奨フェイス1行のみを使います。
+    ' 店型2陳列数(本部推奨)は GetStoreType2FaceAddition による最終加算専用です。
+    HqFaceBase = ToDouble(ws.Cells(planRow + FACE_HQ_1_OFFSET, colNo).Value)
 End Function
 
 Public Function GetStoreType2FaceAddition(ByVal ws As Worksheet, ByVal planRow As Long, ByVal colNo As Long) As Long
@@ -420,8 +431,9 @@ Public Function GetStoreType2FaceAddition(ByVal ws As Worksheet, ByVal planRow A
 End Function
 
 Public Function ShouldAdjustByHqFace(ByVal ws As Worksheet, ByVal planRow As Long, ByVal colNo As Long, ByVal minVal As Long) As Boolean
-    ' 通常の自動計算対象は、本部推奨フェイスが実行時の下限値を超える商品です。
+    ' 通常の自動計算対象は、本部推奨フェイス1が実行時の下限値を超える商品です。
+    ' 店型2陳列数(本部推奨)は判定に使いません（最終加算専用）。
     ' 販売予定なしや下限値以下の本部推奨は、呼び出し側で別ルールとして扱います。
     If minVal < 0 Then minVal = 0
-    ShouldAdjustByHqFace = (HqFaceTotal(ws, planRow, colNo) > CDbl(minVal))
+    ShouldAdjustByHqFace = (HqFaceBase(ws, planRow, colNo) > CDbl(minVal))
 End Function

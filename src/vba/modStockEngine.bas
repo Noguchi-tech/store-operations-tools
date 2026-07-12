@@ -5,17 +5,19 @@ Option Explicit
 ' =============================================================================
 ' 在庫調整エンジン
 ' =============================================================================
-' 自動調整と手動調整の共通本体です。
-' 入口側（modStockControl / modManualMode）はモード名・目標手持週数・最下限値だけを渡し、
+' 自動調整・手動調整・HB食品用調整の共通本体です。
+' 入口側（modStockControl / modManualMode）はモード名・目標手持週数・最下限値などを渡し、
 ' ここで SKU ブロックごとの販売計画とフェイス陳列数を計算します。
 
-Public Sub RunStockControlCore(ByVal modeName As String, ByVal targetWeeks As Double, ByVal minVal As Long, Optional ByVal targetColsOverride As Variant, Optional ByVal appendTwoWeekSuffix As Boolean = False)
+Public Sub RunStockControlCore(ByVal modeName As String, ByVal targetWeeks As Double, ByVal minVal As Long, Optional ByVal targetColsOverride As Variant, Optional ByVal appendTwoWeekSuffix As Boolean = False, Optional ByVal useStoreType2 As Boolean = True)
     Const PROC_NAME As String = "RunStockControlCore"
 
     On Error GoTo EH
 
-    ' このプロシージャは、自動調整・手動調整の共通本体です。
+    ' このプロシージャは、自動調整・手動調整・HB食品用調整の共通本体です。
     ' modeName は画面表示と保存名、targetWeeks / minVal はフェイス陳列数の算出条件に使います。
+    ' useStoreType2 が False の場合（HB食品用）は、店型2陳列数(本部推奨)を加算にも
+    ' 販売予定なし判定にも使わず、本部推奨フェイス1のみで計算します。
     Dim wb As Workbook
     Dim ws As Worksheet
     Dim wsFlag As Worksheet
@@ -98,9 +100,9 @@ Public Sub RunStockControlCore(ByVal modeName As String, ByVal targetWeeks As Do
         ' 直近実績がない新商品相当は、過去実績倍率を使えないため SKU ごと一切触りません。
         If IsLikelyNewProduct(ws, planRow) Then GoTo NEXT_SKU
 
-        ' 本部推奨フェイス2行が0の対象週は、販売予定なしとして販売計画・フェイスとも一切触りません。
+        ' 本部推奨フェイスが0の対象週は、販売予定なしとして販売計画・フェイスとも一切触りません。
         ' 全対象列が販売予定なしなら、過去実績倍率の計算も行わず SKU ごとスキップします。
-        If Not HasAnySalesPlanTargetWeek(ws, planRow, cols) Then GoTo NEXT_SKU
+        If Not HasAnySalesPlanTargetWeek(ws, planRow, cols, useStoreType2) Then GoTo NEXT_SKU
 
         stepName = "直近3週の倍率計算"
         ratio = CalcRatioByTermAverage(ws, planRow, hqRow)
@@ -112,7 +114,7 @@ Public Sub RunStockControlCore(ByVal modeName As String, ByVal targetWeeks As Do
             colLetter = CStr(c)
             colNo = ws.Columns(colLetter).Column
 
-            If Not IsNoSalesPlanWeek(ws, planRow, colNo) Then
+            If Not IsNoSalesPlanWeek(ws, planRow, colNo, useStoreType2) Then
                 stepName = "販売計画の自動計算"
                 If ShouldAdjustByHqFace(ws, planRow, colNo, minVal) Then
                     If CanWriteTargetCell(ws.Cells(planRow, colNo), includeIntentioned, PLAN_EDITABLE_COLOR()) Then
@@ -133,12 +135,12 @@ Public Sub RunStockControlCore(ByVal modeName As String, ByVal targetWeeks As Do
             colLetter = CStr(c)
             colNo = ws.Columns(colLetter).Column
 
-            If Not IsNoSalesPlanWeek(ws, planRow, colNo) Then
+            If Not IsNoSalesPlanWeek(ws, planRow, colNo, useStoreType2) Then
                 stepName = "フェイス陳列数の自動計算"
                 If ShouldAdjustByHqFace(ws, planRow, colNo, minVal) Then
                     If CanWriteTargetCell(ws.Cells(stockRow, colNo), includeIntentioned, FACE_EDITABLE_COLOR()) Then
                         currentPlan = ToDouble(ws.Cells(planRow, colNo).Value)
-                        faceVal = GetPriorityFaceQty(ws, planRow, colNo, currentPlan, minVal, targetWeeks)
+                        faceVal = GetPriorityFaceQty(ws, planRow, colNo, currentPlan, minVal, targetWeeks, useStoreType2)
                         If WriteIfChanged(ws, wsFlag, stockRow, colLetter, CDbl(faceVal), planRow, stockRow) Then
                             faceChangedCount = faceChangedCount + 1
                         End If
@@ -150,9 +152,19 @@ Public Sub RunStockControlCore(ByVal modeName As String, ByVal targetWeeks As Do
                         End If
                     End If
                 ElseIf CanWriteTargetCell(ws.Cells(stockRow, colNo), includeIntentioned, FACE_EDITABLE_COLOR()) Then
-                    stepName = "本部推奨優先フェイス陳列数の調整"
-                    If AdjustFaceForLowHqIfNeeded(ws, wsFlag, stockRow, colLetter, planRow, minVal, targetWeeks) Then
-                        faceChangedCount = faceChangedCount + 1
+                    If HqFaceBase(ws, planRow, colNo) > 0# Then
+                        stepName = "本部推奨優先フェイス陳列数の調整"
+                        If AdjustFaceForLowHqIfNeeded(ws, wsFlag, stockRow, colLetter, planRow, minVal, targetWeeks, useStoreType2) Then
+                            faceChangedCount = faceChangedCount + 1
+                        End If
+                    Else
+                        ' 本部推奨フェイス1が0で店型2陳列数(本部推奨)だけに数値がある週は、
+                        ' 計算・店型2加算を行わず、シート上下限から外れた既存値の補正だけ行います。
+                        ' （HB食品用調整ではこの週自体が販売予定なしとしてスキップされます）
+                        stepName = "フェイス1が0の週の上下限補正"
+                        If ClampExistingFaceIfNeeded(ws, wsFlag, stockRow, colLetter, planRow, minVal) Then
+                            faceChangedCount = faceChangedCount + 1
+                        End If
                     End If
                 ElseIf Not includeIntentioned Then
                     stepName = "意思入れ済みフェイス陳列数の上下限補正"

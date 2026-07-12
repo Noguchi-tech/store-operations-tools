@@ -3,9 +3,9 @@ Option Private Module
 Option Explicit
 
 ' =============================================================================
-' 保存先フォルダ選択・記憶
+' 保存先フォルダ選択
 ' =============================================================================
-' 調整後ブックの保存先（Downloads 固定）、AM維持フラグ履歴の前回保存先の再利用、
+' 調整後ブック・AM維持フラグ履歴ブックの保存先（いずれも Downloads 固定）と、
 ' フォルダピッカーの初期位置を扱います。
 
 Public Function ResolveAdjustedWorkbookSaveFolder() As String
@@ -53,43 +53,24 @@ Public Function PickAdjustedWorkbookSaveFolder() As String
 End Function
 
 Public Function ResolveKeepFaceHistoryFolder() As String
-    ' 前回保存先が使える場合は再利用し、使えない場合は選び直して設定へ保存します。
-    Dim savedFolder As String
-    Dim ans As VbMsgBoxResult
-    Dim pickedFolder As String
+    ' AM維持フラグ履歴ブックの保存先も、調整後ブックと同じく Downloads フォルダに固定します。
+    ' 同名の履歴ブック（mmddAM維持フラグ商品履歴.xlsx）へ追記していく仕様のため、
+    ' 保存先を毎回そろえてダイアログなしで確定させます。
+    ' Downloads が見つからないPCに限り、フォルダ選択ダイアログへ切り替えます。
+    ' 空文字を返した場合、呼び出し側（ExecuteKeepFaceFlagEvacuation）は調整全体を中止します。
+    Dim folderPath As String
 
-    savedFolder = ReadAddInSetting(KEEP_FACE_HISTORY_SETTING_KEY)
-    If Len(savedFolder) > 0 And FolderExists(savedFolder) Then
-        ans = MsgBox( _
-            "AM維持フラグ履歴ブックの保存先は現在こちらです。" & vbCrLf & vbCrLf & _
-            savedFolder & vbCrLf & vbCrLf & _
-            "この保存先を使いますか？" & vbCrLf & _
-            "はい：この保存先を使う" & vbCrLf & _
-            "いいえ：保存先を選び直す" & vbCrLf & _
-            "キャンセル：処理を中止", _
-            vbYesNoCancel + vbQuestion, _
-            "履歴ブック保存先")
-
-        If ans = vbYes Then
-            ResolveKeepFaceHistoryFolder = savedFolder
-            Exit Function
-        ElseIf ans = vbCancel Then
-            Exit Function
-        End If
-    ElseIf Len(savedFolder) > 0 Then
-        MsgBox "前回の保存先が見つかりません。" & vbCrLf & _
-               savedFolder & vbCrLf & _
-               "保存先を選び直してください。", vbInformation, "履歴ブック保存先"
+    folderPath = GetDefaultDownloadFolder()
+    If Len(folderPath) > 0 Then
+        ResolveKeepFaceHistoryFolder = folderPath
+        Exit Function
     End If
 
-    pickedFolder = PickKeepFaceHistoryFolder()
-    If Len(pickedFolder) = 0 Then Exit Function
-
-    WriteAddInSetting KEEP_FACE_HISTORY_SETTING_KEY, pickedFolder
-    ResolveKeepFaceHistoryFolder = pickedFolder
+    ResolveKeepFaceHistoryFolder = PickKeepFaceHistoryFolder()
 End Function
 
 Public Function PickKeepFaceHistoryFolder() As String
+    ' Downloads を解決できないPC向けのフォールバックとして、
     ' AM維持フラグの履歴ブックを保存するフォルダをユーザーに選択してもらいます。
     Dim fd As FileDialog
 

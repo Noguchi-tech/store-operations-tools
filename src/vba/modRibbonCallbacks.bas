@@ -45,6 +45,18 @@ EH:
     ReportMacroError "RunManualAdjustFromRibbon", "手動調整ボタン", Err.Number, Err.Description, ActiveWorkbook
 End Sub
 
+Public Sub RunHbFoodAdjustFromRibbon(ByVal control As IRibbonControl)
+    On Error GoTo EH
+
+    ' HB食品用は、店型2陳列数(本部推奨)を使わない手動調整です。
+    ' customUI14.xml: btnHbFoodAdjust
+    Call 在庫HB食品用調整実行
+    Exit Sub
+
+EH:
+    ReportMacroError "RunHbFoodAdjustFromRibbon", "HB食品用調整ボタン", Err.Number, Err.Description, ActiveWorkbook
+End Sub
+
 Public Sub RunResetIntentionFromRibbon(ByVal control As IRibbonControl)
     On Error GoTo EH
 

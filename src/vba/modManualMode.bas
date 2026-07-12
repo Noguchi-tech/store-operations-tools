@@ -7,9 +7,37 @@ Option Explicit
 ' =============================================================================
 ' 目標手持週数とフェイス陳列数の最下限値をユーザー入力で受け取り、
 ' 共通エンジン RunStockControlCore に渡します。
+' HB食品用調整も同じ入力フローを使い、店型2陳列数(本部推奨)だけ使わない設定で実行します。
 
 Public Sub 在庫手動調整実行()
     Const PROC_NAME As String = "在庫手動調整実行"
+
+    On Error GoTo EH
+
+    ' 手動調整は、店型2陳列数(本部推奨)の加算を含む標準の計算で実行します。
+    RunManualAdjustmentFlow "手動調整", True
+    Exit Sub
+
+EH:
+    ReportMacroError PROC_NAME, "手動調整フロー呼び出し", Err.Number, Err.Description, ActiveWorkbook
+End Sub
+
+Public Sub 在庫HB食品用調整実行()
+    Const PROC_NAME As String = "在庫HB食品用調整実行"
+
+    On Error GoTo EH
+
+    ' HB食品用は、店型2陳列数(本部推奨)を一切使わず、
+    ' フェイス陳列数(本部推奨)＝本部推奨フェイス1のみで計算します。
+    RunManualAdjustmentFlow "HB食品用調整", False
+    Exit Sub
+
+EH:
+    ReportMacroError PROC_NAME, "HB食品用調整フロー呼び出し", Err.Number, Err.Description, ActiveWorkbook
+End Sub
+
+Private Sub RunManualAdjustmentFlow(ByVal modeName As String, ByVal useStoreType2 As Boolean)
+    Const PROC_NAME As String = "RunManualAdjustmentFlow"
 
     On Error GoTo EH
 
@@ -19,13 +47,13 @@ Public Sub 在庫手動調整実行()
     Dim minVal As Long
     Dim stepName As String
 
-    ' 手動調整では、フェイス陳列数だけに効く目標手持週数をユーザーに指定してもらいます。
+    ' 手動系の調整では、フェイス陳列数だけに効く目標手持週数をユーザーに指定してもらいます。
     stepName = "目標手持週数の入力"
     strWeeks = InputBox( _
         "目標とする手持週数を入力してください。" & vbCrLf & vbCrLf & _
         "例：1.8 → 販売計画の1.8週分に近いフェイス陳列数へ調整" & vbCrLf & _
         "※販売計画は自動調整と同じロジックで計算し、この数値の影響は受けません。", _
-        "手持週数の設定", "2")
+        "手持週数の設定（" & modeName & "）", "2")
 
     If StrPtr(strWeeks) = 0 Then Exit Sub
     If Not IsNumeric(strWeeks) Then
@@ -47,7 +75,7 @@ Public Sub 在庫手動調整実行()
         "フェイス陳列数の最下限値を入力してください。" & vbCrLf & vbCrLf & _
         "通常は 5 のままで問題ありません。" & vbCrLf & _
         "本部推奨より低く入力済みの値は、本部推奨まで戻します。", _
-        "最下限値の設定", CStr(DEFAULT_MIN_VAL))
+        "最下限値の設定（" & modeName & "）", CStr(DEFAULT_MIN_VAL))
 
     If StrPtr(strMin) = 0 Then Exit Sub
     If Not IsNumeric(strMin) Then
@@ -63,9 +91,9 @@ Public Sub 在庫手動調整実行()
 
     ' 入力チェックが終わったら、以降の計算・書き込みは自動調整と同じ共通処理を使います。
     stepName = "在庫調整エンジン呼び出し"
-    RunStockControlCore "手動調整", targetWeeks, minVal
+    RunStockControlCore modeName, targetWeeks, minVal, useStoreType2:=useStoreType2
     Exit Sub
 
 EH:
-    ReportMacroError PROC_NAME, stepName, Err.Number, Err.Description, ActiveWorkbook
+    ReportMacroError PROC_NAME & "（" & modeName & "）", stepName, Err.Number, Err.Description, ActiveWorkbook
 End Sub
