@@ -173,45 +173,28 @@ Public Function GetFaceUpperLimit(ByVal ws As Worksheet, ByVal planRow As Long, 
     End If
 End Function
 
-Public Function GetBestFaceQty(ByVal planVal As Double, ByVal lowerFace As Double, ByVal upperFace As Double, Optional ByVal minVal As Long = DEFAULT_MIN_VAL, Optional ByVal targetWeeks As Double = 2#) As Long
-    ' 販売計画 × 目標手持週数に最も近い整数を、フェイス陳列数上下限内で選びます。
-    Dim lo As Long
-    Dim hi As Long
+Public Function GetBestFaceQty(ByVal planVal As Double, Optional ByVal targetWeeks As Double = 2#) As Long
+    ' Return the nearest whole-number weeks quantity without applying face limits.
     Dim targetQty As Double
     Dim lowCandidate As Long
     Dim highCandidate As Long
     Dim lowDiff As Double
     Dim highDiff As Double
 
-    lo = GetEffectiveFaceLower(lowerFace, minVal)
-    hi = CLng(Fix(upperFace))
-    If hi < lo Then hi = lo
-
     If planVal <= 0# Then
-        GetBestFaceQty = lo
         Exit Function
     End If
 
     If targetWeeks <= 0# Then targetWeeks = 2#
     targetQty = targetWeeks * planVal
 
-    If targetQty <= CDbl(lo) Then
-        GetBestFaceQty = lo
-        Exit Function
-    End If
-
-    If targetQty >= CDbl(hi) Then
-        GetBestFaceQty = hi
+    If targetQty > CDbl(MAX_COUNT) Then
+        GetBestFaceQty = MAX_COUNT
         Exit Function
     End If
 
     lowCandidate = CLng(Fix(targetQty))
     highCandidate = lowCandidate + 1
-
-    If lowCandidate < lo Then lowCandidate = lo
-    If lowCandidate > hi Then lowCandidate = hi
-    If highCandidate < lo Then highCandidate = lo
-    If highCandidate > hi Then highCandidate = hi
 
     lowDiff = Abs((CDbl(lowCandidate) / planVal) - targetWeeks)
     highDiff = Abs((CDbl(highCandidate) / planVal) - targetWeeks)
@@ -224,13 +207,13 @@ Public Function GetBestFaceQty(ByVal planVal As Double, ByVal lowerFace As Doubl
 End Function
 
 Public Function GetPriorityFaceQty(ByVal ws As Worksheet, ByVal planRow As Long, ByVal colNo As Long, ByVal planVal As Double, Optional ByVal minVal As Long = DEFAULT_MIN_VAL, Optional ByVal targetWeeks As Double = 2#, Optional ByVal addStoreType2 As Boolean = True) As Long
-    ' 優先順位は「シート上下限 > 手持週数 > 運用下限値/HQ関係」。売れ筋を機械的に下げないため、手持週数側の必要数を先に見ます。
-    ' addStoreType2 が False の場合（HB食品用）は、店型2陳列数(本部推奨)を加算しません。
+    ' Add store type 2 before applying effective face limits.
     Dim lowerFace As Double
     Dim upperFace As Long
     Dim hqFace As Double
-    Dim handWeeksVal As Long
+    Dim weeksQty As Long
     Dim relationFloor As Long
+    Dim effectiveLower As Long
     Dim candidateVal As Long
 
     If minVal < 0 Then minVal = 0
@@ -239,7 +222,7 @@ Public Function GetPriorityFaceQty(ByVal ws As Worksheet, ByVal planRow As Long,
     upperFace = GetFaceUpperLimit(ws, planRow, colNo)
     hqFace = HqFaceBase(ws, planRow, colNo)
 
-    handWeeksVal = GetBestFaceQty(planVal, lowerFace, CDbl(upperFace), 0, targetWeeks)
+    weeksQty = GetBestFaceQty(planVal, targetWeeks)
 
     If hqFace > CDbl(minVal) Then
         relationFloor = minVal
@@ -249,16 +232,13 @@ Public Function GetPriorityFaceQty(ByVal ws As Worksheet, ByVal planRow As Long,
         relationFloor = 0
     End If
 
-    If handWeeksVal >= relationFloor Then
-        candidateVal = handWeeksVal
-    Else
-        candidateVal = relationFloor
+    If addStoreType2 Then
+        weeksQty = weeksQty + GetStoreType2FaceAddition(ws, planRow, colNo)
     End If
 
-    ' 店型2陳列数(本部推奨)に数値が入っている場合は、その数値をそのまま加算します（半分にはしません）。
-    If addStoreType2 Then
-        candidateVal = candidateVal + GetStoreType2FaceAddition(ws, planRow, colNo)
-    End If
+    effectiveLower = CeilToLong(lowerFace)
+    If relationFloor > effectiveLower Then effectiveLower = relationFloor
+    candidateVal = ClampLong(weeksQty, CDbl(effectiveLower), CDbl(upperFace))
 
     GetPriorityFaceQty = ClampFaceValueToSheetLimits(candidateVal, ws, planRow, colNo)
 End Function
